@@ -1,0 +1,4 @@
+#ifndef DEPARTMENTITEM_H
+#define DEPARTMENTITEM_H
+
+#endif // DEPARTMENTITEM_H
