@@ -5,6 +5,16 @@ const QVector<QPointer<TreeItem> > &TreeItem::childItems() const
     return _childItems;
 }
 
+QString TreeItem::name() const
+{
+    return _name;
+}
+
+void TreeItem::setName(const QString &name)
+{
+    _name = name;
+}
+
 TreeItem::TreeItem(QObject *parent):QObject(parent)
 {
 
@@ -57,8 +67,6 @@ bool TreeItem::mapped()
 {
     return true;
 }
-
-
 
 TreeItem *TreeItem::parentItem() const
 {

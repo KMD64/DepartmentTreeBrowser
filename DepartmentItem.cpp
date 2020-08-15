@@ -1,19 +1,11 @@
 #include "DepartmentItem.h"
-DepartmentItem::DepartmentItem(QObject *parent) : TreeItem(parent),_name("Department")
+DepartmentItem::DepartmentItem(QObject *parent) : TreeItem(parent)
 {
-
+    setName("Department");
 }
 
 
-QString DepartmentItem::name() const
-{
-    return _name;
-}
 
-void DepartmentItem::setName(const QString &name)
-{
-    _name = name;
-}
 
 
 qint32 DepartmentItem::employeeCount()

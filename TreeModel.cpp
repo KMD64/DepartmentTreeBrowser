@@ -7,15 +7,14 @@
 //-------------------------------------------------------------
 //Helper functions for getting data from index
 //-------------------------------------------------------------
-TreeItem *TreeModel::itemFromIndex(const QModelIndex &index){
+TreeItem *TreeModel::itemFromIndex(const QModelIndex &index) const{
     if(index.isValid()){
         return static_cast<TreeItem*>(index.internalPointer());
     }
     return _root;
 }
 
-TreeItemFactory::ItemType TreeModel::typeFromIndex(const QModelIndex &parent)
-{
+TreeItemFactory::ItemType TreeModel::typeFromIndex(const QModelIndex &parent) const{
     if(parent.isValid()){
         return TreeItemFactory::Employee;
     }
@@ -42,8 +41,8 @@ TreeModel::TreeModel(QObject *parent):
         }
         _root->addChild(item);
     }
-    stk = new QUndoStack(this);
 
+    stk = new QUndoStack(this);
 }
 
 TreeModel::~TreeModel()
@@ -57,14 +56,9 @@ QModelIndex TreeModel::index(int row, int column, const QModelIndex &parent) con
     if(!hasIndex(row,column,parent)){
         return QModelIndex();
     }
+    auto item = itemFromIndex(parent);
+    return createIndex(row,column,item->child_at(row));
 
-    if(!parent.isValid()){
-        return createIndex(row,column,_root->child_at(row));
-    }
-    else{
-        auto item = static_cast<TreeItem*>(parent.internalPointer());
-        return createIndex(row,column,item->child_at(row));
-    }
 }
 
 QModelIndex TreeModel::parent(const QModelIndex &child) const
@@ -155,10 +149,8 @@ bool TreeModel::insertRows(int row, int count, const QModelIndex &parent)
 {
 
     TreeItem * parentItem = itemFromIndex(parent);
-    TreeItemFactory::ItemType type = parent.isValid()?TreeItemFactory::Employee:TreeItemFactory::Department;
-
     int startRow = std::clamp(row,0,parentItem->children().size());
-    stk->push(new RowsInsertionCommand(startRow,count,type,parent,this));
+    stk->push(new RowsInsertionCommand(startRow,count,parent,this));
     return true;
 }
 
@@ -166,7 +158,6 @@ bool TreeModel::removeRows(int row, int count, const QModelIndex &parent)
 {
     TreeItem* item = itemFromIndex(parent);
     int realCount = row+count-item->childItems().size();
-
     stk->push(new RowsRemoveCommand(row,std::max(count,realCount),parent,this));
     return true;
 }
@@ -182,18 +173,22 @@ QUndoStack *TreeModel::undoStack()
 //--------------------------------------------------------------------------------------------------------------------------------------------
 //Rows Insertion command
 //--------------------------------------------------------------------------------------------------------------------------------------------
-TreeModel::RowsInsertionCommand::RowsInsertionCommand(int row, int count, TreeItemFactory::ItemType type, const QModelIndex &parent, TreeModel *model):
+TreeModel::RowsInsertionCommand::RowsInsertionCommand(int row, int count, const QModelIndex &parentIndex, TreeModel *model,QUndoCommand* parent):
+    QUndoCommand (parent),
     _row(row),
     _count(count),
-    _type(type),
-    _parentIndex(parent),
+    _parentIndex(parentIndex),
     _mdl(model)
 {
-    setText(tr("Insertion: %1").arg(TreeItemFactory::getItemTypeString(type)));
+    setText(tr("Insertion: %1").arg(TreeItemFactory::getItemTypeString(_mdl->typeFromIndex(parentIndex))));
 }
 
 void TreeModel::RowsInsertionCommand::undo()
 {
+    //restoring _parentIndex
+    for(_parentIndex = QModelIndex();!_rootOffset.isEmpty();_rootOffset.pop()){
+        _parentIndex = _mdl->index(_rootOffset.top(),0,_parentIndex);
+    }
     TreeItem *parentItem = _mdl->itemFromIndex(_parentIndex);
     _mdl->beginRemoveRows(_parentIndex,_row,_row+_count-1);
     parentItem->removeChild(_row,_count);
@@ -202,21 +197,26 @@ void TreeModel::RowsInsertionCommand::undo()
 
 void TreeModel::RowsInsertionCommand::redo()
 {
+    //save parent position
+    for(QModelIndex index = _parentIndex;index.isValid();index = index.parent()){
+        _rootOffset.push(index.row());
+    }
     TreeItem *parentItem = _mdl->itemFromIndex(_parentIndex);
     if(!parentItem->mapped())return;
     _mdl->beginInsertRows(_parentIndex,_row,_row+_count-1);
     for(int i=0;i<_count;++i){
-        parentItem->insertChild(_row+i,TreeItemFactory::createItem(_type));
+        parentItem->insertChild(_row+i,TreeItemFactory::createItem(_mdl->typeFromIndex(_parentIndex)));
     }
     _mdl->endInsertRows();
 }
 //--------------------------------------------------------------------------------------------------------------------------------------------
 //Rows Removing command
 //--------------------------------------------------------------------------------------------------------------------------------------------
-TreeModel::RowsRemoveCommand::RowsRemoveCommand(int row, int count, const QModelIndex &parent, TreeModel *model):
+TreeModel::RowsRemoveCommand::RowsRemoveCommand(int row, int count, const QModelIndex &parentIndex, TreeModel *model,QUndoCommand* parent):
+    QUndoCommand (parent),
     _row(row),
     _count(count),
-    _parentIndex(parent),
+    _parentIndex(parentIndex),
     _mdl(model)
 {
     setText(tr("Removing: %1 to %2").arg(row).arg(row+count-1));
@@ -224,9 +224,10 @@ TreeModel::RowsRemoveCommand::RowsRemoveCommand(int row, int count, const QModel
 
 void TreeModel::RowsRemoveCommand::undo()
 {
-    //parent index internal pointer may be invalid, update from model
-    qDebug()<<_parentIndex;
-    qDebug()<<childCount();
+    //restoring _parentIndex
+    for(_parentIndex = QModelIndex();!_rootOffset.isEmpty();_rootOffset.pop()){
+        _parentIndex = _mdl->index(_rootOffset.top(),0,_parentIndex);
+    }
     _mdl->beginInsertRows(_parentIndex,_row,_row+_count-1);
     //Restoring deleted rows
     auto parentItem = _mdl->itemFromIndex(_parentIndex);
@@ -246,19 +247,21 @@ void TreeModel::RowsRemoveCommand::undo()
         parentItem->insertChild(_row+rowOffset,item);
     }
     _mdl->endInsertRows();
-
 }
 
 void TreeModel::RowsRemoveCommand::redo()
 {
-    //First recursively delete all child items from indexed item
-
+    //First recursively delete all rows from index
     for (int offset=0;offset<_count;++offset) {
         auto index = _mdl->index(_row+offset,0,_parentIndex);//mark the target
         auto count = _mdl->rowCount(index);
         if(count==0)continue;//No need to delete
-        //Here comes recursion
-        _mdl->removeRows(0,count,index);
+        //Here comes the recursion
+        _mdl->stk->push(new RowsRemoveCommand(0,count,index,_mdl,this));
+    }
+    //need to save relative position of parent
+    for(QModelIndex index = _parentIndex;index.isValid();index=index.parent()){
+        _rootOffset.push(index.row());
     }
     //start removing rows
     _mdl->beginRemoveRows(_parentIndex,_row,_row+_count-1);
