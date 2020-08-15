@@ -3,6 +3,7 @@
 
 #include "TreeItemFactory.h"
 #include <QAbstractItemModel>
+#include <QLinkedList>
 #include <QStack>
 #include <QUndoStack>
 //-------------------------------------------------------------------------------
@@ -18,12 +19,17 @@ protected:
 //QUndoCommand implementations
 //-------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------
-    class RowsInsertionCommand:public QUndoCommand{
+class ModelCommand:public QUndoCommand{
+protected:
+    ModelCommand(const QModelIndex &index,TreeModel *mdl,QUndoCommand *parent = nullptr);
+    QLinkedList<int> _rootOffset;
+    TreeModel *_mdl;
+    QModelIndex getIndex();
+};
+//-------------------------------------------------------------------------------
+    class RowsInsertionCommand:public ModelCommand{
         int _row;
         int _count;
-        QModelIndex _parentIndex;
-        TreeModel *_mdl;
-        QStack<int> _rootOffset;
     public:
         RowsInsertionCommand(int row,int count,const QModelIndex &parentIndex,TreeModel *model,QUndoCommand *parent=nullptr);
         // QUndoCommand interface
@@ -32,13 +38,11 @@ protected:
         void redo() override;
     };
 //-------------------------------------------------------------------------------
-    class RowsRemoveCommand:public QUndoCommand{
+    class RowsRemoveCommand:public ModelCommand{
         int _row;
         int _count;
-        QModelIndex _parentIndex;
-        TreeModel *_mdl;
         QList<QLinkedList<QVariant>> items;
-        QStack<int> _rootOffset;
+
     public:
         RowsRemoveCommand(int row,int count,const QModelIndex& parentIndex,TreeModel *model,QUndoCommand *parent=nullptr);
         // QUndoCommand interface
@@ -47,9 +51,21 @@ protected:
         void redo() override;
     };
 //-------------------------------------------------------------------------------
-
+//Row data change command
 //-------------------------------------------------------------------------------
+class SetDataCommand:public ModelCommand{
+    int _column;
+    int _role;
+    QVariant _value;
+    QVariant _oldValue;
+public:
+    SetDataCommand(const QModelIndex &index, int role, const QVariant &value, TreeModel* mdl, QUndoCommand *command=nullptr);
 
+    // QUndoCommand interface
+public:
+    void undo() override;
+    void redo() override;
+};
 //-------------------------------------------------------------------------------
 public:
     TreeModel(QObject* parent = nullptr);
@@ -74,6 +90,7 @@ public:
 protected:
     TreeItem* itemFromIndex(const QModelIndex& parent) const;
     TreeItemFactory::ItemType typeFromIndex(const QModelIndex& parent) const;
+    void emitDataChange(const QModelIndex& topLeft, const QModelIndex &bottomRight,QVector<int> roles = QVector<int>());
 };
 
 #endif // TREEMODEL_H

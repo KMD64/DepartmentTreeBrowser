@@ -22,6 +22,11 @@ TreeItemFactory::ItemType TreeModel::typeFromIndex(const QModelIndex &parent) co
         return TreeItemFactory::Department;
     }
 }
+
+void TreeModel::emitDataChange(const QModelIndex &topLeft, const QModelIndex &bottomRight, QVector<int> roles)
+{
+    emit dataChanged(topLeft,bottomRight,roles);
+}
 //-------------------------------------------------------------
 //TreeModel realization
 //-------------------------------------------------------------
@@ -50,7 +55,6 @@ TreeModel::~TreeModel()
     delete _root;
 }
 
-
 QModelIndex TreeModel::index(int row, int column, const QModelIndex &parent) const
 {
     if(!hasIndex(row,column,parent)){
@@ -58,11 +62,11 @@ QModelIndex TreeModel::index(int row, int column, const QModelIndex &parent) con
     }
     auto item = itemFromIndex(parent);
     return createIndex(row,column,item->child_at(row));
-
 }
 
 QModelIndex TreeModel::parent(const QModelIndex &child) const
 {
+
     if(!child.isValid())
         return QModelIndex();
 
@@ -126,23 +130,8 @@ bool TreeModel::setData(const QModelIndex &index, const QVariant &value, int rol
     if(!index.isValid()){
         return false;
     }
-    if(role == Qt::EditRole){
-    auto item = static_cast<QObject*>(index.internalPointer());
-    auto property = item->metaObject()->property(index.column()+1);
-    if(!property.isValid())
-        return false;
-    if(!property.isWritable()){
-        return false;
-    }
-    if(property.isReadable()){
-        if(auto propValue = property.read(item);propValue == value){
-            return false;
-        }
-    }
-    property.write(item,value);
+    stk->push(new SetDataCommand(index,role,value,this));
     return true;
-    }
-    return false;
 }
 
 bool TreeModel::insertRows(int row, int count, const QModelIndex &parent)
@@ -170,42 +159,58 @@ QUndoStack *TreeModel::undoStack()
 //--------------------------------------------------------------------------------------------------------------------------------------------
 //Commands realization
 //--------------------------------------------------------------------------------------------------------------------------------------------
+TreeModel::ModelCommand::ModelCommand(const QModelIndex &index, TreeModel *mdl, QUndoCommand *parent):
+    QUndoCommand (parent),
+    _mdl(mdl)
+{
+    //saving relative item position
+    for(auto cindex = index;cindex.isValid();cindex = cindex.parent()){
+        _rootOffset.append(cindex.row());
+    }
+}
+
+QModelIndex TreeModel::ModelCommand::getIndex()
+{
+    auto index = QModelIndex();
+    for(auto iter = _rootOffset.rbegin();iter!=_rootOffset.rend();++iter)
+        index = _mdl->index(*iter,0,index);
+    return index;
+}
+
+
 //--------------------------------------------------------------------------------------------------------------------------------------------
 //Rows Insertion command
 //--------------------------------------------------------------------------------------------------------------------------------------------
 TreeModel::RowsInsertionCommand::RowsInsertionCommand(int row, int count, const QModelIndex &parentIndex, TreeModel *model,QUndoCommand* parent):
-    QUndoCommand (parent),
+    ModelCommand(parentIndex,model,parent),
     _row(row),
-    _count(count),
-    _parentIndex(parentIndex),
-    _mdl(model)
+    _count(count)
 {
     setText(tr("Insertion: %1").arg(TreeItemFactory::getItemTypeString(_mdl->typeFromIndex(parentIndex))));
 }
 
 void TreeModel::RowsInsertionCommand::undo()
 {
-    //restoring _parentIndex
-    for(_parentIndex = QModelIndex();!_rootOffset.isEmpty();_rootOffset.pop()){
-        _parentIndex = _mdl->index(_rootOffset.top(),0,_parentIndex);
-    }
-    TreeItem *parentItem = _mdl->itemFromIndex(_parentIndex);
-    _mdl->beginRemoveRows(_parentIndex,_row,_row+_count-1);
+    //restoring parentIndex
+    auto parentIndex = getIndex();
+    auto parentItem = _mdl->itemFromIndex(parentIndex);
+    _mdl->beginRemoveRows(parentIndex,_row,_row+_count-1);
     parentItem->removeChild(_row,_count);
     _mdl->endRemoveRows();
 }
 
 void TreeModel::RowsInsertionCommand::redo()
 {
-    //save parent position
-    for(QModelIndex index = _parentIndex;index.isValid();index = index.parent()){
-        _rootOffset.push(index.row());
+    auto parentIndex = getIndex();
+    TreeItem* parentItem = _mdl->itemFromIndex(parentIndex);
+    if(!parentItem->mapped()){
+        //does nothing
+        this->setObsolete(true);
+        return;
     }
-    TreeItem *parentItem = _mdl->itemFromIndex(_parentIndex);
-    if(!parentItem->mapped())return;
-    _mdl->beginInsertRows(_parentIndex,_row,_row+_count-1);
+    _mdl->beginInsertRows(parentIndex,_row,_row+_count-1);
     for(int i=0;i<_count;++i){
-        parentItem->insertChild(_row+i,TreeItemFactory::createItem(_mdl->typeFromIndex(_parentIndex)));
+        parentItem->insertChild(_row+i,TreeItemFactory::createItem(_mdl->typeFromIndex(parentIndex)));
     }
     _mdl->endInsertRows();
 }
@@ -213,11 +218,9 @@ void TreeModel::RowsInsertionCommand::redo()
 //Rows Removing command
 //--------------------------------------------------------------------------------------------------------------------------------------------
 TreeModel::RowsRemoveCommand::RowsRemoveCommand(int row, int count, const QModelIndex &parentIndex, TreeModel *model,QUndoCommand* parent):
-    QUndoCommand (parent),
+    ModelCommand (parentIndex,model,parent),
     _row(row),
-    _count(count),
-    _parentIndex(parentIndex),
-    _mdl(model)
+    _count(count)
 {
     setText(tr("Removing: %1 to %2").arg(row).arg(row+count-1));
 }
@@ -225,13 +228,12 @@ TreeModel::RowsRemoveCommand::RowsRemoveCommand(int row, int count, const QModel
 void TreeModel::RowsRemoveCommand::undo()
 {
     //restoring _parentIndex
-    for(_parentIndex = QModelIndex();!_rootOffset.isEmpty();_rootOffset.pop()){
-        _parentIndex = _mdl->index(_rootOffset.top(),0,_parentIndex);
-    }
-    _mdl->beginInsertRows(_parentIndex,_row,_row+_count-1);
+
+    auto parentIndex = getIndex();
+    auto parentItem = _mdl->itemFromIndex(parentIndex);
+    _mdl->beginInsertRows(parentIndex,_row,_row+_count-1);
     //Restoring deleted rows
-    auto parentItem = _mdl->itemFromIndex(_parentIndex);
-    auto type = _mdl->typeFromIndex(_parentIndex);
+    auto type = _mdl->typeFromIndex(parentIndex);
     for(int rowOffset=0;rowOffset<_count;++rowOffset){
         auto item = TreeItemFactory::createItem(type);
         //Filling writable properies
@@ -251,21 +253,20 @@ void TreeModel::RowsRemoveCommand::undo()
 
 void TreeModel::RowsRemoveCommand::redo()
 {
+
+    auto parentIndex = getIndex();
+    auto parentItem = _mdl->itemFromIndex(parentIndex);
     //First recursively delete all rows from index
     for (int offset=0;offset<_count;++offset) {
-        auto index = _mdl->index(_row+offset,0,_parentIndex);//mark the target
+        auto index = _mdl->index(_row+offset,0,parentIndex);//mark the target
         auto count = _mdl->rowCount(index);
         if(count==0)continue;//No need to delete
         //Here comes the recursion
         _mdl->stk->push(new RowsRemoveCommand(0,count,index,_mdl,this));
     }
-    //need to save relative position of parent
-    for(QModelIndex index = _parentIndex;index.isValid();index=index.parent()){
-        _rootOffset.push(index.row());
-    }
+
     //start removing rows
-    _mdl->beginRemoveRows(_parentIndex,_row,_row+_count-1);
-    auto parentItem = _mdl->itemFromIndex(_parentIndex);
+    _mdl->beginRemoveRows(parentIndex,_row,_row+_count-1);
     //Copying writable properties from items at range [row, row+count-1]
     for(int i=0;i<_count;++i){
        auto childItem = parentItem->child_at(_row+i);
@@ -283,3 +284,42 @@ void TreeModel::RowsRemoveCommand::redo()
     _mdl->endRemoveRows();
 
 }
+
+
+TreeModel::SetDataCommand::SetDataCommand(const QModelIndex &index, int role,const QVariant &value, TreeModel *mdl, QUndoCommand *command):
+    ModelCommand(index,mdl,command),
+    _column(index.column()),
+    _role(role),
+    _value(value)
+{
+    _oldValue = _mdl->data(index,role);
+    setText(tr("Data replacing:%1:%2->%3").arg(_column).arg(_oldValue.toString()).arg(_value.toString()));
+}
+
+void TreeModel::SetDataCommand::undo()
+{
+    auto index = getIndex();
+    auto item = _mdl->itemFromIndex(index);
+    switch(_role){
+    case Qt::DisplayRole:
+    case Qt::EditRole:{
+        item->metaObject()->property(_column+1).write(item,_oldValue);
+        _mdl->emitDataChange(index,index);
+        }
+    }
+}
+
+void TreeModel::SetDataCommand::redo()
+{
+    auto index = getIndex();
+    auto item = _mdl->itemFromIndex(index);
+    switch(_role){
+    case Qt::DisplayRole:
+    case Qt::EditRole:{
+        item->metaObject()->property(_column+1).write(item,_value);
+        _mdl->emitDataChange(index,index);
+    }
+    }
+}
+
+
