@@ -6,25 +6,26 @@
 #include <QLinkedList>
 #include <QStack>
 #include <QUndoStack>
-//-------------------------------------------------------------------------------
+//===============================================================================
 //TreeModel
-//-------------------------------------------------------------------------------
+//===============================================================================
 class TreeModel:public QAbstractItemModel
 {
     Q_OBJECT
-    QUndoStack* stk;
+    QUndoStack* _stk;
     TreeItem *_root;
 protected:
-//-------------------------------------------------------------------------------
+//===============================================================================
 //QUndoCommand implementations
-//-------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------
+//===============================================================================
+
 class ModelCommand:public QUndoCommand{
 protected:
     ModelCommand(const QModelIndex &index,TreeModel *mdl,QUndoCommand *parent = nullptr);
     QLinkedList<int> _rootOffset;
     TreeModel *_mdl;
     QModelIndex getIndex();
+
 };
 //-------------------------------------------------------------------------------
     class RowsInsertionCommand:public ModelCommand{
@@ -51,8 +52,6 @@ protected:
         void redo() override;
     };
 //-------------------------------------------------------------------------------
-//Row data change command
-//-------------------------------------------------------------------------------
 class SetDataCommand:public ModelCommand{
     int _column;
     int _role;
@@ -66,7 +65,7 @@ public:
     void undo() override;
     void redo() override;
 };
-//-------------------------------------------------------------------------------
+//===============================================================================
 public:
     TreeModel(QObject* parent = nullptr);
     ~TreeModel() override;
@@ -87,6 +86,7 @@ public:
 public:
     QUndoStack *undoStack();
     const TreeItem *root();
+    void setRoot(TreeItem* root);
 protected:
     TreeItem* itemFromIndex(const QModelIndex& parent) const;
     TreeItemFactory::ItemType typeFromIndex(const QModelIndex& parent) const;

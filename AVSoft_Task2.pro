@@ -26,21 +26,23 @@ CONFIG += c++17
 
 SOURCES += \
         DepartmentItem.cpp \
+        DepartmentItemXmlLoader.cpp \
         EmploymentItem.cpp \
+        EmploymentItemXmlLoader.cpp \
         TreeItem.cpp \
         TreeItemFactory.cpp \
         TreeModel.cpp \
-        TreeModelLoader.cpp \
         main.cpp \
         Widget.cpp
 
 HEADERS += \
         DepartmentItem.h \
+        DepartmentItemXmlLoader.h \
         EmploymentItem.h \
+        EmploymentItemXmlLoader.h \
         TreeItem.h \
         TreeItemFactory.h \
         TreeModel.h \
-        TreeModelLoader.h \
         Widget.h
 
 FORMS += \

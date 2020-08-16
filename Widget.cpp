@@ -1,3 +1,5 @@
+#include "DepartmentItem.h"
+#include "DepartmentItemXmlLoader.h"
 #include "Widget.h"
 #include "ui_Widget.h"
 #include <QFileDialog>
@@ -5,15 +7,18 @@
 #include <QMessageBox>
 #include <QDebug>
 #include <QResizeEvent>
-using namespace std::chrono_literals;
+#include <QDomDocument>
 Widget::Widget(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::Widget),
     mdl(new TreeModel(this))
 {
     ui->setupUi(this);
-    ui->treeView->setModel(mdl);
+    _view = ui->treeView;
+    _view->setModel(mdl);
     ui->undoView->setStack(mdl->undoStack());
+    _view->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+
 }
 
 Widget::~Widget()
@@ -37,12 +42,39 @@ void Widget::on_browseButton_clicked(bool)
 
 void Widget::on_loadButton_clicked(bool)
 {
+    //open file
+    QFile file(ui->FilePathEdit->text());
+    if(!file.open(QFile::ReadOnly|QFile::Text)){
+        //Message
+        QMessageBox::warning(this,tr("File open error"),tr("Failed to open the file"));
+        return;
+    }
+    //setting up document
+    TreeItem *root = new TreeItem();
+    try{
+        QDomDocument doc;
+        QString msg;
+        int row,col;
+        if(!doc.setContent(&file,false,&msg,&row,&col))throw tr("Error on row %1, column %2:\n %3").arg(row).arg(col).arg(msg);
+        //preparing root
 
-//    if(!mdl){
-//        mdl = new TreeModel(this);
-//        ui->treeView->setModel(mdl);
-//    }
-
+        root->setName("root");
+        auto rootNode = doc.documentElement();
+        if(rootNode.nodeName().toLower()!="departments"){
+            throw tr("Invalid node name: %1").arg(rootNode.nodeName());
+        }
+        auto departmentNodes = rootNode.childNodes();
+        for(int i=0;i<departmentNodes.size();++i){
+            auto depNode = departmentNodes.at(i);
+            DepartmentItem* item = new DepartmentItem(root);
+            if(!DepartmentItemXmlLoader(item).load(depNode,&msg))throw msg;
+            root->addChild(item);
+        }
+    }catch(const QString &str){
+        root->deleteLater();
+        QMessageBox::warning(this,tr("XML processing error"),str);
+    }
+    mdl->setRoot(root);
 }
 
 void Widget::on_addDepartmentButton_clicked(bool)

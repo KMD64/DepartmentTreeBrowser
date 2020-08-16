@@ -29,6 +29,8 @@ public:
 
     QString name() const;
     void setName(const QString &name);
+
+
 };
 
 #endif // TREEITEM_H

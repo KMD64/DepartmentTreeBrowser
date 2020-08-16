@@ -42,7 +42,7 @@ bool TreeItem::removeChild(int r, int n)
 {
     if(mapped()){
         for(int i=0;i<n;++i){
-            delete _childItems[r+i];
+            _childItems[r+i]->deleteLater();
         }
         _childItems.remove(r,n);
     }
@@ -67,6 +67,8 @@ bool TreeItem::mapped()
 {
     return true;
 }
+
+
 
 TreeItem *TreeItem::parentItem() const
 {

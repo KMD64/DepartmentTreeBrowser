@@ -6,6 +6,7 @@
 #include <QThread>
 #include <QUndoStack>
 #include <QWidget>
+#include <qtreeview.h>
 
 namespace Ui {
 class Widget;
@@ -23,8 +24,9 @@ public:
 private:
     Ui::Widget *ui;
     TreeModel *mdl;
-
+    QTreeView *_view;
 private slots:
+    //button slots
     void on_browseButton_clicked(bool);
     void on_loadButton_clicked(bool);
     void on_addDepartmentButton_clicked(bool);
@@ -32,6 +34,7 @@ private slots:
     void on_deleteButton_clicked(bool);
     void on_undoButton_clicked(bool);
     void on_redoButton_clicked(bool);
+
     // QWidget interface
 protected:
     void resizeEvent(QResizeEvent *event) override;

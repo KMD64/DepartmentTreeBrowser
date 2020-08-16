@@ -3,8 +3,6 @@
 
 #include "EmploymentItem.h"
 #include "TreeItem.h"
-#include <QObject>
-#include <QVector>
 
 
 class DepartmentItem:public TreeItem{

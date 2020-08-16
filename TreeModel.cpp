@@ -2,10 +2,9 @@
 
 #include <QMetaProperty>
 #include <cmath>
-#include <QDebug>
 #include <QLinkedList>
 //-------------------------------------------------------------
-//Helper functions for getting data from index
+//Helper functions
 //-------------------------------------------------------------
 TreeItem *TreeModel::itemFromIndex(const QModelIndex &index) const{
     if(index.isValid()){
@@ -27,11 +26,14 @@ void TreeModel::emitDataChange(const QModelIndex &topLeft, const QModelIndex &bo
 {
     emit dataChanged(topLeft,bottomRight,roles);
 }
+
+
 //-------------------------------------------------------------
 //TreeModel realization
 //-------------------------------------------------------------
 TreeModel::TreeModel(QObject *parent):
     QAbstractItemModel (parent),
+    _stk(new QUndoStack(this)),
     _root(new TreeItem(this))
 {
 
@@ -47,7 +49,6 @@ TreeModel::TreeModel(QObject *parent):
         _root->addChild(item);
     }
 
-    stk = new QUndoStack(this);
 }
 
 TreeModel::~TreeModel()
@@ -130,7 +131,7 @@ bool TreeModel::setData(const QModelIndex &index, const QVariant &value, int rol
     if(!index.isValid()){
         return false;
     }
-    stk->push(new SetDataCommand(index,role,value,this));
+    _stk->push(new SetDataCommand(index,role,value,this));
     return true;
 }
 
@@ -139,7 +140,7 @@ bool TreeModel::insertRows(int row, int count, const QModelIndex &parent)
 
     TreeItem * parentItem = itemFromIndex(parent);
     int startRow = std::clamp(row,0,parentItem->children().size());
-    stk->push(new RowsInsertionCommand(startRow,count,parent,this));
+    _stk->push(new RowsInsertionCommand(startRow,count,parent,this));
     return true;
 }
 
@@ -147,13 +148,22 @@ bool TreeModel::removeRows(int row, int count, const QModelIndex &parent)
 {
     TreeItem* item = itemFromIndex(parent);
     int realCount = row+count-item->childItems().size();
-    stk->push(new RowsRemoveCommand(row,std::max(count,realCount),parent,this));
+    _stk->push(new RowsRemoveCommand(row,std::max(count,realCount),parent,this));
     return true;
 }
 
 QUndoStack *TreeModel::undoStack()
 {
-    return stk;
+    return _stk;
+}
+
+void TreeModel::setRoot(TreeItem *root)
+{
+    beginResetModel();
+    _root->deleteLater();
+    _root = root;
+    undoStack()->clear();
+    endResetModel();
 }
 
 //--------------------------------------------------------------------------------------------------------------------------------------------
@@ -262,7 +272,7 @@ void TreeModel::RowsRemoveCommand::redo()
         auto count = _mdl->rowCount(index);
         if(count==0)continue;//No need to delete
         //Here comes the recursion
-        _mdl->stk->push(new RowsRemoveCommand(0,count,index,_mdl,this));
+        _mdl->_stk->push(new RowsRemoveCommand(0,count,index,_mdl,this));
     }
 
     //start removing rows
