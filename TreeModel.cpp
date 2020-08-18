@@ -37,18 +37,6 @@ TreeModel::TreeModel(QObject *parent):
     _root(new TreeItem(this))
 {
 
-    int employeeCount[]{4,3,5};
-    for(int i=0;i<3;++i){
-        auto item = TreeItemFactory::createItem(TreeItemFactory::Department,_root);
-        item->setProperty("name",QString("Department #%1").arg(i));
-        for(int j=0;j<employeeCount[i];++j){
-            TreeItem* employee = TreeItemFactory::createItem(TreeItemFactory::Employee,item);
-            employee->setProperty("salary",j*100000+i*100);
-            item->addChild(employee);
-        }
-        _root->addChild(item);
-    }
-
 }
 
 TreeModel::~TreeModel()
