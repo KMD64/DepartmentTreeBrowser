@@ -1,49 +1,73 @@
-#include "DepartmentItem.h"
-#include "DepartmentItemXmlLoader.h"
+#include "RootItemXmlLoader.h"
 #include "Widget.h"
-#include "ui_Widget.h"
+#include "ui_MainWindow.h"
+
 #include <QFileDialog>
 #include <QFile>
 #include <QMessageBox>
-#include <QDebug>
 #include <QResizeEvent>
 #include <QDomDocument>
+#include <QTextStream>
+
 Widget::Widget(QWidget *parent) :
-    QWidget(parent),
-    ui(new Ui::Widget),
+    QMainWindow(parent),
+    ui(new Ui::MainWindow),
     mdl(new TreeModel(this))
 {
     ui->setupUi(this);
     _view = ui->treeView;
     _view->setModel(mdl);
-    ui->undoView->setStack(mdl->undoStack());
     _view->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
-
+    //provide undo/redo actions
+    auto undoAction = mdl->undoStack()->createUndoAction(ui->menuEdit,"Undo:");
+    undoAction->setShortcut(QKeySequence("Ctrl+Z"));
+    auto redoAction = mdl->undoStack()->createRedoAction(ui->menuEdit,"Redo:");
+    redoAction->setShortcut(QKeySequence("Ctrl+Y"));
+    ui->menuEdit->insertAction(ui->menuEdit->actions().at(0),undoAction);
+    ui->menuEdit->insertAction(undoAction,redoAction);
+    ui->undoView->setStack(mdl->undoStack());
 }
 
 Widget::~Widget()
 {
     delete ui;
-    mdl->deleteLater();
+    delete mdl;
 }
 
-void Widget::on_browseButton_clicked(bool)
+bool Widget::askPath(bool forSave)
 {
-    QString filePath = QDir::homePath();
-
-    if(QString text=ui->FilePathEdit->text();!text.isEmpty()){
-        filePath=text;
+    if(filePath.isEmpty()){
+        filePath=QDir::homePath();
     }
-    filePath = QFileDialog::getOpenFileName(this,"Open File",filePath,"Xml File (*.xml)");
-    if(!filePath.isEmpty()){
-        ui->FilePathEdit->setText(filePath);
+    QString newFilePath;
+    if(forSave){
+        newFilePath = QFileDialog::getSaveFileName(this,tr("Save file"),filePath,"Xml File (*.xml)");
+    }
+    else{
+        newFilePath = QFileDialog::getOpenFileName(this,tr("Open File"),filePath,"Xml File (*.xml)");
+    }
+
+    if(!newFilePath.isEmpty()){
+        filePath = newFilePath;
+        return true;
+    }
+    else{
+        return false;
     }
 }
-
-void Widget::on_loadButton_clicked(bool)
+//Action commands
+void Widget::on_actionNew_triggered()
 {
+    filePath.clear();
+    mdl->setRoot(new TreeItem(mdl));
+
+}
+
+void Widget::on_actionOpen_triggered()
+{
+    if(!askPath())return;
     //open file
-    QFile file(ui->FilePathEdit->text());
+    QFile file(filePath);
     if(!file.open(QFile::ReadOnly|QFile::Text)){
         //Message
         QMessageBox::warning(this,tr("File open error"),tr("Failed to open the file"));
@@ -58,31 +82,58 @@ void Widget::on_loadButton_clicked(bool)
         if(!doc.setContent(&file,false,&msg,&row,&col))throw tr("Error on row %1, column %2:\n %3").arg(row).arg(col).arg(msg);
         //preparing root
 
-        root->setName("root");
         auto rootNode = doc.documentElement();
-        if(rootNode.nodeName().toLower()!="departments"){
-            throw tr("Invalid node name: %1").arg(rootNode.nodeName());
-        }
-        auto departmentNodes = rootNode.childNodes();
-        for(int i=0;i<departmentNodes.size();++i){
-            auto depNode = departmentNodes.at(i);
-            DepartmentItem* item = new DepartmentItem(root);
-            if(!DepartmentItemXmlLoader(item).load(depNode,&msg))throw msg;
-            root->addChild(item);
+        if(!RootItemXmlLoader(root).load(rootNode,&msg)){
+            throw msg;
         }
     }catch(const QString &str){
         root->deleteLater();
         QMessageBox::warning(this,tr("XML processing error"),str);
+        return;
+    }catch(std::exception e){
+        root->deleteLater();
+        QMessageBox::warning(this,tr("Exception"),e.what());
+        return;
     }
+
     mdl->setRoot(root);
 }
 
-void Widget::on_addDepartmentButton_clicked(bool)
+void Widget::on_actionSave_triggered()
+{
+    if(filePath.isEmpty()&&!askPath(true))return;
+    QFile file(filePath);
+    if(!file.open(QFile::WriteOnly|QFile::Text)){
+        QMessageBox::warning(this,tr("File open error"),tr("Failed to open the file"));
+        return;
+    }
+    QDomDocument doc;
+    doc.appendChild(doc.createProcessingInstruction("xml","version = \"1.0\" encoding = \"UTF-8\""));
+    doc.appendChild(RootItemXmlLoader(const_cast<TreeItem *>(mdl->root())).save(doc));
+    QTextStream stream(&file);
+    doc.save(stream,4);
+}
+
+void Widget::on_actionSaveAs_triggered()
+{
+    auto path = filePath;
+    if(!askPath(true))return;
+    on_actionSave_triggered();
+    if(!path.isEmpty())
+        filePath = path;
+}
+
+void Widget::on_actionExit_triggered()
+{
+    this->close();
+}
+
+void Widget::on_actionAddDepartment_triggered()
 {
     mdl->insertRow(mdl->rowCount(QModelIndex()));
 }
 
-void Widget::on_addEmployeeButton_clicked(bool)
+void Widget::on_actionAddEmployee_triggered()
 {
     auto sModel = ui->treeView->selectionModel();
     if(sModel->hasSelection()){
@@ -91,7 +142,7 @@ void Widget::on_addEmployeeButton_clicked(bool)
     }
 }
 
-void Widget::on_deleteButton_clicked(bool)
+void Widget::on_actionDelete_triggered()
 {
     auto sModel = ui->treeView->selectionModel();
     if(sModel->hasSelection()){
@@ -100,17 +151,7 @@ void Widget::on_deleteButton_clicked(bool)
     }
 }
 
-void Widget::on_undoButton_clicked(bool)
-{
-    mdl->undoStack()->undo();
-}
-
-void Widget::on_redoButton_clicked(bool)
-{
-    mdl->undoStack()->redo();
-}
-
 void Widget::resizeEvent(QResizeEvent *event)
 {
-    ui->verticalLayoutWidget->resize(event->size());
+    ui->horizontalLayoutWidget->resize(event->size());
 }

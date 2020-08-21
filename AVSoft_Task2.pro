@@ -29,6 +29,7 @@ SOURCES += \
         DepartmentItemXmlLoader.cpp \
         EmploymentItem.cpp \
         EmploymentItemXmlLoader.cpp \
+        RootItemXmlLoader.cpp \
         TreeItem.cpp \
         TreeItemFactory.cpp \
         TreeModel.cpp \
@@ -40,12 +41,14 @@ HEADERS += \
         DepartmentItemXmlLoader.h \
         EmploymentItem.h \
         EmploymentItemXmlLoader.h \
+        RootItemXmlLoader.h \
         TreeItem.h \
         TreeItemFactory.h \
         TreeModel.h \
         Widget.h
 
 FORMS += \
+        MainWindow.ui \
         Widget.ui
 
 # Default rules for deployment.

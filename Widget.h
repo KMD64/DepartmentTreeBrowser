@@ -3,16 +3,17 @@
 
 #include "TreeModel.h"
 
+#include <QMainWindow>
 #include <QThread>
 #include <QUndoStack>
 #include <QWidget>
 #include <qtreeview.h>
 
 namespace Ui {
-class Widget;
+class MainWindow;
 }
 
-class Widget : public QWidget
+class Widget : public QMainWindow
 {
     Q_OBJECT
 
@@ -22,18 +23,21 @@ public:
     ~Widget() override;
 
 private:
-    Ui::Widget *ui;
+    QString filePath;
+    Ui::MainWindow *ui;
     TreeModel *mdl;
     QTreeView *_view;
+    bool askPath(bool forSave = false);
 private slots:
-    //button slots
-    void on_browseButton_clicked(bool);
-    void on_loadButton_clicked(bool);
-    void on_addDepartmentButton_clicked(bool);
-    void on_addEmployeeButton_clicked(bool);
-    void on_deleteButton_clicked(bool);
-    void on_undoButton_clicked(bool);
-    void on_redoButton_clicked(bool);
+    void on_actionNew_triggered();
+    void on_actionOpen_triggered();
+    void on_actionSave_triggered();
+    void on_actionSaveAs_triggered();
+    void on_actionExit_triggered();
+    void on_actionAddDepartment_triggered();
+    void on_actionAddEmployee_triggered();
+    void on_actionDelete_triggered();
+
 
     // QWidget interface
 protected:

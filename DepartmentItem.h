@@ -11,8 +11,6 @@ class DepartmentItem:public TreeItem{
     Q_PROPERTY(qreal avgSalary READ avgSalary)
 public:
     explicit DepartmentItem(QObject* parent = nullptr);
-
-
     qint32 employeeCount();
     qreal avgSalary();
 

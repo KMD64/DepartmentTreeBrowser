@@ -8,16 +8,16 @@ class TreeItem:public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString name READ name WRITE setName)
-protected:
     QPointer<TreeItem> _parentItem;
     QString _name;
-    QVector<QPointer<TreeItem>> _childItems;
+    QVector<TreeItem *> _childItems;
+protected:
+    void setParentItem(TreeItem *parentItem);
 public:
     explicit TreeItem(QObject *parent = nullptr);
     virtual ~TreeItem();
 
     TreeItem* parentItem() const;
-    void setParentItem(TreeItem *parentItem);
 
     bool addChild(TreeItem* childItem);
     bool removeChild(int i,int n=1);
@@ -25,7 +25,7 @@ public:
     TreeItem* child_at(int i);
 
     virtual bool mapped();
-    const QVector<QPointer<TreeItem>> &childItems() const;
+    QVector<TreeItem *> &childItems();
 
     QString name() const;
     void setName(const QString &name);

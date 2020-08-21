@@ -9,11 +9,12 @@
 
 class DepartmentItemXmlLoader
 {
-    const QPointer<DepartmentItem> _item;
+    QPointer<DepartmentItem> _item;
 public:
     DepartmentItemXmlLoader(DepartmentItem *item);
+
     bool load(const QDomNode &node,QString *errmsg=nullptr);
-    QDomNode save();
+    QDomNode save(QDomDocument &doc) const;
 };
 
 #endif // DEPARTMENTITEMXMLLOADER_H

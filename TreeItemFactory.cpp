@@ -22,7 +22,9 @@ TreeItem *TreeItemFactory::createItem(ItemType type,TreeItem *parent,const QMap<
         bool result = item->setProperty(key.toStdString().data(),args.value(key));
         qDebug()<<"Insertion data:"<<key<<" "<<value<<":"<<result;
     }
-    item->setParentItem(parent);
+    if(parent&&parent->mapped()){
+        parent->addChild(item);
+    }
     return item;
 }
 

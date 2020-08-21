@@ -1,5 +1,6 @@
 #include "EmploymentItemXmlLoader.h"
 #include <QDebug>
+#include <QMetaProperty>
 EmploymentItemXmlLoader::EmploymentItemXmlLoader(EmploymentItem* item):_item(item)
 {
 
@@ -12,14 +13,11 @@ EmploymentItemXmlLoader::~EmploymentItemXmlLoader()
 bool EmploymentItemXmlLoader::extractText(const QDomNode &node, QString &string)
 {
     auto textNode = node.firstChild();
-    if(textNode.isText()){
-        string = textNode.nodeValue();
-        return true;
-    }
-    throw QObject::tr("Invalid node type: %1").arg(textNode.nodeType());
+    string = textNode.nodeValue();
+    return true;
 }
 
-bool EmploymentItemXmlLoader::load(const QDomNode &node,QString *const errmsg)
+bool EmploymentItemXmlLoader::load(const QDomNode &node,QString * const errmsg)
 {
     try{
         if(!node.isElement())throw QObject::tr("Not an element");
@@ -56,17 +54,31 @@ bool EmploymentItemXmlLoader::load(const QDomNode &node,QString *const errmsg)
         _item->setName(name.join(" ").trimmed());
         _item->setFunction(function);
         _item->setSalary(salary.toInt());
-        return true;
+
     }catch(const QString &str){
         if(errmsg)
             *errmsg = str;
         return false;
     }
+    return true;
 }
 
-QDomNode EmploymentItemXmlLoader::save()
+QDomNode EmploymentItemXmlLoader::save(QDomDocument &doc) const
 {
-    //Not implemented yet
-    return QDomNode();
+    auto node = doc.createElement("employment");
+    auto name = _item->name().split(" ");
+    static const QString tagNames[]{"surname","name","middleName"};
+    for(int i=0;i<3;++i){
+        auto elem = doc.createElement(tagNames[i]);
+        elem.appendChild(doc.createTextNode(name.at(i)));
+        node.appendChild(elem);
+    }
+    for(int i=_item->metaObject()->propertyOffset();i<_item->metaObject()->propertyCount();++i){
+        auto prop = _item->metaObject()->property(i);
+        auto elem = doc.createElement(prop.name());
+        elem.appendChild(doc.createTextNode(prop.read(_item).toString()));
+        node.appendChild(elem);
+    }
+    return node;
 }
 

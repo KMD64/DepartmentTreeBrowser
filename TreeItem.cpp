@@ -1,6 +1,6 @@
 #include "TreeItem.h"
 
-const QVector<QPointer<TreeItem> > &TreeItem::childItems() const
+QVector<TreeItem *> &TreeItem::childItems()
 {
     return _childItems;
 }
@@ -21,7 +21,7 @@ TreeItem::TreeItem(QObject *parent):QObject(parent)
 }
 
 TreeItem::~TreeItem()
-{
+{    
     qDeleteAll(_childItems);
 }
 void TreeItem::setParentItem(TreeItem *parentItem)
@@ -41,9 +41,10 @@ bool TreeItem::addChild(TreeItem *childItem)
 bool TreeItem::removeChild(int r, int n)
 {
     if(mapped()){
-        for(int i=0;i<n;++i){
-            _childItems[r+i]->deleteLater();
-        }
+//        for(int i=0;i<n;++i){
+//            _childItems[r+i]->deleteLater();
+//        }
+        qDeleteAll(_childItems.begin()+r,_childItems.begin()+r+n-1);
         _childItems.remove(r,n);
     }
     return mapped();

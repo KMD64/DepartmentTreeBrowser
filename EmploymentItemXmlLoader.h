@@ -9,13 +9,13 @@
 
 class EmploymentItemXmlLoader
 {
-    const QPointer<EmploymentItem> _item;
+    QPointer<EmploymentItem> _item;
 public:
     EmploymentItemXmlLoader(EmploymentItem *item);
     ~EmploymentItemXmlLoader();
     bool extractText(const QDomNode &node,QString& string);
     bool load(const QDomNode &node, QString *const errmsg=nullptr);
-    QDomNode save();
+    QDomNode save(QDomDocument &doc) const;
 };
 
 #endif // EMPLOYMENTITEMXMLLOADER_H

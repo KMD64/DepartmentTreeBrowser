@@ -49,6 +49,7 @@ QModelIndex TreeModel::index(int row, int column, const QModelIndex &parent) con
     if(!hasIndex(row,column,parent)){
         return QModelIndex();
     }
+    //internal pointer = pointer to parent
     auto item = itemFromIndex(parent);
     return createIndex(row,column,item->child_at(row));
 }
@@ -143,6 +144,11 @@ bool TreeModel::removeRows(int row, int count, const QModelIndex &parent)
 QUndoStack *TreeModel::undoStack()
 {
     return _stk;
+}
+
+const TreeItem *TreeModel::root()
+{
+    return _root;
 }
 
 void TreeModel::setRoot(TreeItem *root)
