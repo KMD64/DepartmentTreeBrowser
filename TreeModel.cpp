@@ -173,6 +173,16 @@ TreeModel::ModelCommand::ModelCommand(const QModelIndex &index, TreeModel *mdl, 
     }
 }
 
+QString TreeModel::ModelCommand::offsetString()
+{
+    QStringList strs;
+    strs.append("root");
+    for(int i:_rootOffset){
+        strs.append(QString::number(i));
+    }
+    return strs.join(",");
+}
+
 QModelIndex TreeModel::ModelCommand::getIndex()
 {
     auto index = QModelIndex();
@@ -190,7 +200,7 @@ TreeModel::RowsInsertionCommand::RowsInsertionCommand(int row, int count, const 
     _row(row),
     _count(count)
 {
-    setText(tr("Insertion: %1").arg(TreeItemFactory::getItemTypeString(_mdl->typeFromIndex(parentIndex))));
+    setText(tr("Insertion: %1: (%2,%3)").arg(offsetString()).arg(row).arg(row+count-1));
 }
 
 void TreeModel::RowsInsertionCommand::undo()
@@ -226,7 +236,7 @@ TreeModel::RowsRemoveCommand::RowsRemoveCommand(int row, int count, const QModel
     _row(row),
     _count(count)
 {
-    setText(tr("Removing: %1 to %2").arg(row).arg(row+count-1));
+    setText(tr("Removing: %1: (%2,%3)").arg(offsetString()).arg(row).arg(row+count-1));
 }
 
 void TreeModel::RowsRemoveCommand::undo()
@@ -297,7 +307,8 @@ TreeModel::SetDataCommand::SetDataCommand(const QModelIndex &index, int role,con
     _value(value)
 {
     _oldValue = _mdl->data(index,role);
-    setText(tr("Data replacing:%1:%2->%3").arg(_column).arg(_oldValue.toString()).arg(_value.toString()));
+
+    setText(tr("Data change:%1:%3:%4->%5").arg(offsetString()).arg(_column).arg(_oldValue.toString()).arg(_value.toString()));
 }
 
 void TreeModel::SetDataCommand::undo()

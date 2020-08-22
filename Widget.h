@@ -24,8 +24,8 @@ public:
 
 private:
     QString filePath;
-    Ui::MainWindow *ui;
-    TreeModel *mdl;
+    Ui::MainWindow *_ui;
+    TreeModel *_mdl;
     QTreeView *_view;
     bool askPath(bool forSave = false);
 private slots:

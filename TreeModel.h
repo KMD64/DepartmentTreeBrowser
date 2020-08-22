@@ -24,6 +24,7 @@ protected:
     ModelCommand(const QModelIndex &index,TreeModel *mdl,QUndoCommand *parent = nullptr);
     QLinkedList<int> _rootOffset;
     TreeModel *_mdl;
+    QString offsetString();
     QModelIndex getIndex();
 
 };

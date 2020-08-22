@@ -11,27 +11,27 @@
 
 Widget::Widget(QWidget *parent) :
     QMainWindow(parent),
-    ui(new Ui::MainWindow),
-    mdl(new TreeModel(this))
+    _ui(new Ui::MainWindow),
+    _mdl(new TreeModel(this))
 {
-    ui->setupUi(this);
-    _view = ui->treeView;
-    _view->setModel(mdl);
+    _ui->setupUi(this);
+    _view = _ui->treeView;
+    _view->setModel(_mdl);
     _view->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
     //provide undo/redo actions
-    auto undoAction = mdl->undoStack()->createUndoAction(ui->menuEdit,"Undo:");
+    auto undoAction = _mdl->undoStack()->createUndoAction(_ui->menuEdit,"Undo:");
     undoAction->setShortcut(QKeySequence("Ctrl+Z"));
-    auto redoAction = mdl->undoStack()->createRedoAction(ui->menuEdit,"Redo:");
+    auto redoAction = _mdl->undoStack()->createRedoAction(_ui->menuEdit,"Redo:");
     redoAction->setShortcut(QKeySequence("Ctrl+Y"));
-    ui->menuEdit->insertAction(ui->menuEdit->actions().at(0),undoAction);
-    ui->menuEdit->insertAction(undoAction,redoAction);
-    ui->undoView->setStack(mdl->undoStack());
+    _ui->menuEdit->insertAction(_ui->menuEdit->actions().at(0),undoAction);
+    _ui->menuEdit->insertAction(undoAction,redoAction);
+    _ui->undoView->setStack(_mdl->undoStack());
 }
 
 Widget::~Widget()
 {
-    delete ui;
-    delete mdl;
+    delete _ui;
+    delete _mdl;
 }
 
 bool Widget::askPath(bool forSave)
@@ -59,7 +59,7 @@ bool Widget::askPath(bool forSave)
 void Widget::on_actionNew_triggered()
 {
     filePath.clear();
-    mdl->setRoot(new TreeItem(mdl));
+    _mdl->setRoot(new TreeItem(_mdl));
 
 }
 
@@ -96,7 +96,7 @@ void Widget::on_actionOpen_triggered()
         return;
     }
 
-    mdl->setRoot(root);
+    _mdl->setRoot(root);
 }
 
 void Widget::on_actionSave_triggered()
@@ -109,7 +109,7 @@ void Widget::on_actionSave_triggered()
     }
     QDomDocument doc;
     doc.appendChild(doc.createProcessingInstruction("xml","version = \"1.0\" encoding = \"UTF-8\""));
-    doc.appendChild(RootItemXmlLoader(const_cast<TreeItem *>(mdl->root())).save(doc));
+    doc.appendChild(RootItemXmlLoader(const_cast<TreeItem *>(_mdl->root())).save(doc));
     QTextStream stream(&file);
     doc.save(stream,4);
 }
@@ -130,28 +130,28 @@ void Widget::on_actionExit_triggered()
 
 void Widget::on_actionAddDepartment_triggered()
 {
-    mdl->insertRow(mdl->rowCount(QModelIndex()));
+    _mdl->insertRow(_mdl->rowCount(QModelIndex()));
 }
 
 void Widget::on_actionAddEmployee_triggered()
 {
-    auto sModel = ui->treeView->selectionModel();
+    auto sModel = _ui->treeView->selectionModel();
     if(sModel->hasSelection()){
         auto parent = sModel->selectedRows()[0];
-        mdl->insertRow(mdl->rowCount(parent),parent);
+        _mdl->insertRow(_mdl->rowCount(parent),parent);
     }
 }
 
 void Widget::on_actionDelete_triggered()
 {
-    auto sModel = ui->treeView->selectionModel();
+    auto sModel = _ui->treeView->selectionModel();
     if(sModel->hasSelection()){
         auto items = sModel->selectedRows();
-        mdl->removeRows(items[0].row(),items.size(),items[0].parent());
+        _mdl->removeRows(items[0].row(),items.size(),items[0].parent());
     }
 }
 
 void Widget::resizeEvent(QResizeEvent *event)
 {
-    ui->horizontalLayoutWidget->resize(event->size());
+    _ui->horizontalLayoutWidget->resize(_ui->centralwidget->size());
 }
